@@ -8,7 +8,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "test": "jest",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
@@ -20,12 +21,15 @@
     "expo-sqlite": "^55.0.11",
     "expo-status-bar": "~3.0.9",
     "react": "19.1.0",
+    "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-safe-area-context": "^5.7.0",
     "react-native-screens": "^4.24.0",
+    "react-native-svg": "15.12.1",
     "react-native-web": "^0.21.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/jest": "^30.0.0",
     "@types/react": "~19.1.0",
     "jest": "^30.3.0",

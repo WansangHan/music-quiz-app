@@ -8,12 +8,14 @@ import { Colors } from '../constants/colors';
 import { FontSize, Spacing, BorderRadius } from '../constants/spacing';
 
 export function SettingsScreen() {
-  const { settings, setDailyNewLimit } = useSettings();
+  const { settings, setDailyNewLimit, setDefaultDisplay } = useSettings();
 
   const adjustLimit = (delta: number) => {
     const next = Math.max(1, Math.min(50, settings.dailyNewLimit + delta));
     setDailyNewLimit(next);
   };
+
+  const isNotation = settings.defaultDisplay === 'notation';
 
   return (
     <ScreenWrapper>
@@ -23,21 +25,36 @@ export function SettingsScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>일일 신규 카드 수</Text>
           <View style={styles.stepper}>
-            <Pressable
-              style={styles.stepButton}
-              onPress={() => adjustLimit(-1)}
-            >
+            <Pressable style={styles.stepButton} onPress={() => adjustLimit(-1)}>
               <Ionicons name="remove-circle-outline" size={28} color={Colors.primary} />
             </Pressable>
             <Text style={styles.stepValue}>{settings.dailyNewLimit}</Text>
-            <Pressable
-              style={styles.stepButton}
-              onPress={() => adjustLimit(1)}
-            >
+            <Pressable style={styles.stepButton} onPress={() => adjustLimit(1)}>
               <Ionicons name="add-circle-outline" size={28} color={Colors.primary} />
             </Pressable>
           </View>
           <Text style={styles.hint}>하루에 새로 학습할 카드 수 (1~50)</Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>기본 문제 표시</Text>
+          <View style={styles.toggleRow}>
+            <Pressable
+              style={[styles.toggleButton, isNotation && styles.toggleActive]}
+              onPress={() => setDefaultDisplay('notation')}
+            >
+              <Ionicons name="musical-notes-outline" size={18} color={isNotation ? '#FFF' : Colors.textSecondary} />
+              <Text style={[styles.toggleText, isNotation && styles.toggleTextActive]}>악보</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.toggleButton, !isNotation && styles.toggleActive]}
+              onPress={() => setDefaultDisplay('text')}
+            >
+              <Ionicons name="text-outline" size={18} color={!isNotation ? '#FFF' : Colors.textSecondary} />
+              <Text style={[styles.toggleText, !isNotation && styles.toggleTextActive]}>텍스트</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.hint}>퀴즈 화면에서 탭하면 전환 가능</Text>
         </View>
 
         <View style={styles.card}>
@@ -99,6 +116,31 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.textSecondary,
     textAlign: 'center',
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    justifyContent: 'center',
+  },
+  toggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.round,
+    backgroundColor: Colors.border,
+  },
+  toggleActive: {
+    backgroundColor: Colors.primary,
+  },
+  toggleText: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  toggleTextActive: {
+    color: '#FFF',
   },
   infoRow: {
     flexDirection: 'row',

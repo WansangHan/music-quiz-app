@@ -1,5 +1,6 @@
 import { getDb } from './client';
 import { UserSettings, DEFAULT_SETTINGS } from '../types/settings';
+import type { DisplayMode } from '../types/settings';
 import { SettingsKey } from '../constants/settingsKeys';
 
 export async function getSettings(): Promise<UserSettings> {
@@ -12,6 +13,7 @@ export async function getSettings(): Promise<UserSettings> {
 
   return {
     dailyNewLimit: parseInt(map.get(SettingsKey.DailyNewLimit) ?? String(DEFAULT_SETTINGS.dailyNewLimit), 10),
+    defaultDisplay: (map.get(SettingsKey.DefaultNotation) ?? DEFAULT_SETTINGS.defaultDisplay) as DisplayMode,
   };
 }
 

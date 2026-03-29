@@ -1,5 +1,5 @@
 import { TopicCategory } from '../constants/topicCategory';
-import { INTERVALS, CHORD_TYPES, SCALE_TYPES, getAllNoteNames, getSolfege, getEnharmonic } from './musicTheory';
+import { INTERVALS, CHORD_TYPES, SCALE_TYPES, getAllNoteNames, getSolfege } from './musicTheory';
 import { CHOICE_COUNT } from '../constants/quiz';
 
 function shuffle<T>(arr: T[]): T[] {
@@ -31,18 +31,11 @@ export function generateChoices(
       break;
     }
     case TopicCategory.Chord: {
-      // 같은 루트의 다른 코드 타입, 또는 다른 루트의 같은 타입
-      const pool = CHORD_TYPES.map((c) => {
-        const rootMatch = question.match(/^([A-G][#b]?)/);
-        const root = rootMatch?.[1] ?? 'C';
-        return `${root} ${c.typeKr}`;
-      });
+      // 같은 루트의 다른 코드 타입
+      const rootMatch = question.match(/^([A-G][#b]?)/);
+      const root = rootMatch?.[1] ?? 'C';
+      const pool = CHORD_TYPES.map((c) => `${root} ${c.typeKr}`);
       distractors = pickDistractors(correctAnswer, pool, needed);
-      if (distractors.length < needed) {
-        const notePool = getAllNoteNames().map((n) => `${n} 메이저`);
-        const more = pickDistractors(correctAnswer, notePool, needed - distractors.length);
-        distractors.push(...more);
-      }
       break;
     }
     case TopicCategory.Scale: {
@@ -63,18 +56,9 @@ export function generateChoices(
     }
     case TopicCategory.NoteName: {
       // 질문에 따라 음이름 또는 계이름 풀 사용
-      const issolfegeAnswer = getSolfege().includes(correctAnswer);
-      const pool = issolfegeAnswer ? getSolfege() : getAllNoteNames();
+      const isSolfegeAnswer = getSolfege().includes(correctAnswer);
+      const pool = isSolfegeAnswer ? getSolfege() : getAllNoteNames();
       distractors = pickDistractors(correctAnswer, pool, needed);
-      // 이명동음 질문이면 이명동음을 오답에 포함하지 않도록
-      const enharmonic = getEnharmonic(correctAnswer);
-      if (enharmonic) {
-        distractors = distractors.filter((d) => d !== enharmonic);
-        if (distractors.length < needed) {
-          const more = pickDistractors(correctAnswer, getAllNoteNames().filter((n) => n !== enharmonic), 1);
-          distractors.push(...more);
-        }
-      }
       break;
     }
   }

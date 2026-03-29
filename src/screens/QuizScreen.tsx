@@ -1,12 +1,14 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuizEngine } from '../hooks/useQuizEngine';
+import { useSettings } from '../hooks/useSettings';
 import { ProgressBar } from '../components/quiz/ProgressBar';
 import { ChoiceButton } from '../components/quiz/ChoiceButton';
 import { PressableScale } from '../components/common/PressableScale';
 import { MasteryBadge } from '../components/common/MasteryBadge';
+import { StaffNotation } from '../components/notation/StaffNotation';
 import { QuizState } from '../constants/quizState';
 import { CATEGORY_LABELS } from '../constants/topicCategory';
 import { Colors } from '../constants/colors';
@@ -17,6 +19,11 @@ export function QuizScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const cards: QuizCard[] = route.params?.cards ?? [];
+  const { settings } = useSettings();
+  const [showNotation, setShowNotation] = useState<boolean | null>(null);
+
+  // 실제 표시 모드: 로컬 토글 > 설정 기본값
+  const displayNotation = showNotation ?? (settings.defaultDisplay === 'notation');
 
   const {
     state,
@@ -85,9 +92,23 @@ export function QuizScreen() {
           </Text>
         </View>
 
-        <View style={styles.questionCard}>
-          <Text style={styles.questionText}>{currentCard.topic.question}</Text>
-        </View>
+        <Pressable
+          style={styles.questionCard}
+          onPress={() => setShowNotation((prev) => prev === null ? settings.defaultDisplay !== 'notation' : !prev)}
+        >
+          {displayNotation && currentCard.topic.notation ? (
+            <StaffNotation
+              notes={currentCard.topic.notation.notes}
+              mode={currentCard.topic.notation.mode}
+              clef={currentCard.topic.notation.clef}
+            />
+          ) : (
+            <Text style={styles.questionText}>{currentCard.topic.question}</Text>
+          )}
+          <Text style={styles.toggleHint}>
+            {displayNotation ? '탭하면 텍스트로' : '탭하면 악보로'}
+          </Text>
+        </Pressable>
 
         <View style={styles.choicesContainer}>
           {currentCard.choices.map((choice, index) => {
@@ -164,6 +185,12 @@ const styles = StyleSheet.create({
     color: Colors.text,
     textAlign: 'center',
     lineHeight: 34,
+  },
+  toggleHint: {
+    fontSize: FontSize.xs,
+    color: Colors.textLight,
+    textAlign: 'center',
+    marginTop: Spacing.xs,
   },
   choicesContainer: {
     gap: Spacing.sm,

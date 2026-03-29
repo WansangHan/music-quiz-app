@@ -23,8 +23,8 @@ function generateIntervalTopics(): TopicData[] {
 
   for (const root of NATURAL_ROOTS) {
     for (const interval of INTERVALS) {
-      if (interval.semitones === 0) continue; // 완전1도 제외 (자명)
-      if (interval.semitones === 12) continue; // 완전8도 제외 (자명)
+      if (interval.semitones === 0) continue;
+      if (interval.semitones === 12) continue;
 
       const target = transpose(root, interval.semitones);
       topics.push({
@@ -36,6 +36,7 @@ function generateIntervalTopics(): TopicData[] {
         description: `${interval.semitones}반음. ${interval.nameEn}`,
         difficulty: interval.semitones <= 5 ? 1 : interval.semitones <= 9 ? 2 : 3,
         sortOrder: order++,
+        notation: { notes: [`${root}4`, `${target}4`], mode: 'sequential' },
       });
     }
   }
@@ -62,6 +63,7 @@ function generateChordTopics(): TopicData[] {
         description: `${root} ${chord.typeKr} (${chord.type}): ${tonesStr}`,
         difficulty: chord.formula.length <= 3 ? 1 : 2,
         sortOrder: order++,
+        notation: { notes: tones.map((t) => `${t}4`), mode: 'stacked' },
       });
     }
   }
@@ -88,6 +90,7 @@ function generateScaleTopics(): TopicData[] {
         description: `${label}: ${tonesStr}`,
         difficulty: scale.type === 'Major' ? 1 : 2,
         sortOrder: order++,
+        notation: { notes: tones.map((t) => `${t}4`), mode: 'sequential' },
       });
     }
   }
@@ -115,6 +118,7 @@ function generateChordToneTopics(): TopicData[] {
           description: `${label}: ${tones.map((t, j) => `${getToneLabel(j, tones.length)}=${t}`).join(', ')}`,
           difficulty: i === 0 ? 1 : chord.formula.length > 3 ? 3 : 2,
           sortOrder: order++,
+          notation: { notes: tones.map((t) => `${t}4`), mode: 'stacked' },
         });
       }
     }
@@ -143,6 +147,7 @@ function generateScaleToneTopics(): TopicData[] {
           description: `${label}: ${tones.map((t, j) => `${j + 1}음=${t}`).join(', ')}`,
           difficulty: scale.type === 'Major' ? 1 : 2,
           sortOrder: order++,
+          notation: { notes: tones.map((t) => `${t}4`), mode: 'sequential' },
         });
       }
     }
@@ -155,7 +160,6 @@ function generateNoteNameTopics(): TopicData[] {
   const topics: TopicData[] = [];
   let order = 0;
 
-  // 계이름 → 음이름 (7개)
   for (const sf of getSolfege()) {
     const note = solfegeToNote(sf);
     topics.push({
@@ -167,13 +171,12 @@ function generateNoteNameTopics(): TopicData[] {
       description: `계이름 ${sf} = 음이름 ${note}`,
       difficulty: 1,
       sortOrder: order++,
+      notation: { notes: [`${note}4`], mode: 'sequential' },
     });
   }
 
-  // 음이름 → 계이름 (7개, 자연음만)
   for (const root of NATURAL_ROOTS) {
     const sf = noteToSolfege(root);
-    if (!sf) continue;
     topics.push({
       id: `notename_to_solfege_${root}`,
       category: TopicCategory.NoteName,
@@ -183,10 +186,10 @@ function generateNoteNameTopics(): TopicData[] {
       description: `음이름 ${root} = 계이름 ${sf}`,
       difficulty: 1,
       sortOrder: order++,
+      notation: { notes: [`${root}4`], mode: 'sequential' },
     });
   }
 
-  // 이명동음 (10개)
   const enharmonicPairs = [
     ['C#', 'Db'], ['D#', 'Eb'], ['F#', 'Gb'], ['G#', 'Ab'], ['A#', 'Bb'],
   ];
@@ -200,6 +203,7 @@ function generateNoteNameTopics(): TopicData[] {
       description: `${sharp} = ${flat} (이명동음: 같은 음, 다른 이름)`,
       difficulty: 2,
       sortOrder: order++,
+      notation: { notes: [`${sharp}4`], mode: 'sequential' },
     });
     topics.push({
       id: `notename_enharmonic_${flat}`,
@@ -210,6 +214,7 @@ function generateNoteNameTopics(): TopicData[] {
       description: `${flat} = ${sharp} (이명동음: 같은 음, 다른 이름)`,
       difficulty: 2,
       sortOrder: order++,
+      notation: { notes: [`${flat}4`], mode: 'sequential' },
     });
   }
 
