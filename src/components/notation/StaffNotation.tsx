@@ -1,243 +1,181 @@
-import React from 'react';
-import { View } from 'react-native';
-import Svg, { Line, Ellipse, G, Text as SvgText } from 'react-native-svg';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import {
-  STAFF,
-  getNotesPositions,
+  toVexFlowNotes,
+  sortForChord,
+  getVoiceParams,
   withOctave,
-  stemDirection,
-  getChordOffsets,
-  Clef,
-} from '../../lib/notationLayout';
+  formatNotesText,
+  type Clef,
+} from '../../lib/vexflowUtils';
 
 interface StaffNotationProps {
-  notes: string[];        // ['C4', 'E4', 'G4'] or ['C', 'E', 'G']
+  notes: string[];
   clef?: Clef;
-  mode?: 'sequential' | 'stacked'; // 스케일 vs 코드
+  mode?: 'sequential' | 'stacked';
   showLabels?: boolean;
   width?: number;
   height?: number;
 }
 
-const NOTE_RX = 7;
-const NOTE_RY = 5;
-const STEM_LENGTH = 30;
-const ACCIDENTAL_OFFSET = 18; // 임시표와 음표 머리 사이 간격
-const STAFF_COLOR = '#CBD5E1';
-const NOTE_COLOR = '#0F172A';
-const LABEL_COLOR = '#6366F1';
-const ACCIDENTAL_COLOR = '#0F172A';
-
-function StaffLines({ x1, x2 }: { x1: number; x2: number }) {
-  return (
-    <G>
-      {STAFF.LINES.map((y) => (
-        <Line key={y} x1={x1} y1={y} x2={x2} y2={y} stroke={STAFF_COLOR} strokeWidth={1} />
-      ))}
-    </G>
-  );
-}
-
-function ClefSymbol({ clef, x }: { clef: Clef; x: number }) {
-  if (clef === 'treble') {
-    // 높은음자리표 — Unicode 𝄞
-    return <SvgText x={x} y={52} fontSize={40} fill={NOTE_COLOR} fontFamily="serif">{'\u{1D11E}'}</SvgText>;
-  }
-  // 낮은음자리표 — Unicode 𝄢
-  return <SvgText x={x} y={48} fontSize={36} fill={NOTE_COLOR} fontFamily="serif">{'\u{1D122}'}</SvgText>;
-}
-
-function LedgerLines({ x, lines }: { x: number; lines: number[] }) {
-  return (
-    <G>
-      {lines.map((y) => (
-        <Line key={y} x1={x - 12} y1={y} x2={x + 12} y2={y} stroke={NOTE_COLOR} strokeWidth={1.2} />
-      ))}
-    </G>
-  );
-}
-
-function Accidental({ x, y, type }: { x: number; y: number; type: '#' | 'b' }) {
-  return (
-    <SvgText
-      x={x}
-      y={y + (type === '#' ? 5 : 4)}
-      fontSize={type === '#' ? 14 : 15}
-      fontWeight="700"
-      fill={ACCIDENTAL_COLOR}
-    >
-      {type}
-    </SvgText>
-  );
-}
-
-function NoteHead({
-  x,
-  y,
-  accidental,
-  ledgerLines,
-  showStem = true,
-}: {
-  x: number;
-  y: number;
-  accidental: '#' | 'b' | null;
-  ledgerLines: number[];
-  showStem?: boolean;
-}) {
-  const dir = stemDirection(y);
-
-  return (
-    <G>
-      <LedgerLines x={x} lines={ledgerLines} />
-      {accidental && <Accidental x={x - ACCIDENTAL_OFFSET} y={y} type={accidental} />}
-      <Ellipse
-        cx={x}
-        cy={y}
-        rx={NOTE_RX}
-        ry={NOTE_RY}
-        fill={NOTE_COLOR}
-        transform={`rotate(-15 ${x} ${y})`}
-      />
-      {showStem && (
-        dir === 'up' ? (
-          <Line x1={x + NOTE_RX} y1={y} x2={x + NOTE_RX} y2={y - STEM_LENGTH} stroke={NOTE_COLOR} strokeWidth={1.8} />
-        ) : (
-          <Line x1={x - NOTE_RX} y1={y} x2={x - NOTE_RX} y2={y + STEM_LENGTH} stroke={NOTE_COLOR} strokeWidth={1.8} />
-        )
-      )}
-    </G>
-  );
+// VexFlow는 DOM이 필요하므로 웹에서만 로드
+let Vex: typeof import('vexflow') | null = null;
+if (Platform.OS === 'web') {
+  Vex = require('vexflow');
 }
 
 export function StaffNotation({
   notes,
   clef = 'treble',
   mode = 'sequential',
-  showLabels = false,
   width: propWidth,
   height: propHeight,
 }: StaffNotationProps) {
-  const notesWithOctave = notes.map((n) => withOctave(n, clef));
-
-  if (mode === 'stacked') {
-    return <StackedNotation notes={notesWithOctave} clef={clef} showLabels={showLabels} width={propWidth} height={propHeight} />;
+  if (Platform.OS === 'web' && Vex) {
+    return (
+      <WebNotation
+        notes={notes}
+        clef={clef}
+        mode={mode}
+        width={propWidth}
+        height={propHeight}
+      />
+    );
   }
-  return <SequentialNotation notes={notesWithOctave} clef={clef} showLabels={showLabels} width={propWidth} height={propHeight} />;
+
+  return <NativeFallback notes={notes} clef={clef} mode={mode} />;
 }
 
-// 코드: 수직으로 쌓기
-function StackedNotation({
+function WebNotation({
   notes,
   clef,
-  showLabels,
+  mode,
   width: propWidth,
   height: propHeight,
 }: {
   notes: string[];
   clef: Clef;
-  showLabels: boolean;
+  mode: 'sequential' | 'stacked';
   width?: number;
   height?: number;
 }) {
-  const CLEF_WIDTH = 30;
-  const positions = getNotesPositions(notes, clef);
-  const offsets = getChordOffsets(positions);
-  const hasAccidentals = positions.some((p) => p.accidental);
-  const accidentalSpace = hasAccidentals ? 20 : 0;
-  const width = propWidth ?? (160 + accidentalSpace + CLEF_WIDTH);
-  const height = propHeight ?? (showLabels ? 90 : 80);
-  const centerX = CLEF_WIDTH + (width - CLEF_WIDTH) / 2 + accidentalSpace / 2;
+  const containerRef = useRef<View>(null);
+  const notesKey = notes.join(',');
 
-  // 기둥: 가장 낮은 음에서 가장 높은 음까지
-  const ys = positions.map((p) => p.y);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const dir = stemDirection((minY + maxY) / 2);
+  const width = propWidth ?? (mode === 'stacked'
+    ? 200
+    : Math.min(notes.length * 60 + 80, 360));
+  const height = propHeight ?? 120;
 
-  // 임시표를 겹치지 않게 열로 배치
-  const accidentalX = centerX - NOTE_RX - ACCIDENTAL_OFFSET;
+  useEffect(() => {
+    if (!Vex) return;
+    const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental } = Vex;
+
+    const div = containerRef.current as unknown as HTMLDivElement;
+    if (!div) return;
+
+    div.innerHTML = '';
+
+    try {
+      const renderer = new Renderer(div, Renderer.Backends.SVG);
+      renderer.resize(width, height);
+      const context = renderer.getContext();
+
+      const staveWidth = width - 20;
+      const stave = new Stave(10, 0, staveWidth);
+      stave.addClef(clef);
+      stave.setContext(context).draw();
+
+      const vexNotes = toVexFlowNotes(notes, clef);
+      let staveNotes: InstanceType<typeof StaveNote>[];
+
+      if (mode === 'stacked') {
+        const { sorted } = sortForChord(vexNotes);
+        const keys = sorted.map((n) => n.key);
+        const chord = new StaveNote({ keys, duration: 'w' });
+        sorted.forEach((n, i) => {
+          if (n.accidental) {
+            chord.addModifier(new Accidental(n.accidental), i);
+          }
+        });
+        staveNotes = [chord];
+      } else {
+        staveNotes = vexNotes.map((vn) => {
+          const note = new StaveNote({ keys: [vn.key], duration: 'q' });
+          if (vn.accidental) {
+            note.addModifier(new Accidental(vn.accidental));
+          }
+          return note;
+        });
+      }
+
+      const { numBeats, beatValue } = getVoiceParams(staveNotes.length, mode);
+      const voice = new Voice({ numBeats, beatValue });
+      voice.addTickables(staveNotes);
+
+      new Formatter().joinVoices([voice]).format([voice], staveWidth - 60);
+      voice.draw(context, stave);
+    } catch (e) {
+      console.warn('VexFlow render error:', e);
+    }
+
+    return () => {
+      const d = containerRef.current as unknown as HTMLDivElement;
+      if (d) d.innerHTML = '';
+    };
+  }, [notesKey, clef, mode, width, height]);
 
   return (
-    <View style={{ alignItems: 'center' }}>
-      <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-        <StaffLines x1={10} x2={width - 10} />
-        <ClefSymbol clef={clef} x={14} />
-        {/* 임시표 열 (음표 왼쪽에 별도 열) */}
-        {positions.map((pos, i) =>
-          pos.accidental ? (
-            <Accidental key={`acc-${i}`} x={accidentalX} y={pos.y} type={pos.accidental} />
-          ) : null
-        )}
-        {/* 음표 열 */}
-        {positions.map((pos, i) => (
-          <G key={i}>
-            <LedgerLines x={centerX + offsets[i]} lines={pos.ledgerLines} />
-            <Ellipse
-              cx={centerX + offsets[i]}
-              cy={pos.y}
-              rx={NOTE_RX}
-              ry={NOTE_RY}
-              fill={NOTE_COLOR}
-              transform={`rotate(-15 ${centerX + offsets[i]} ${pos.y})`}
-            />
-          </G>
-        ))}
-        {/* 단일 기둥 */}
-        {dir === 'up' ? (
-          <Line x1={centerX + NOTE_RX} y1={maxY} x2={centerX + NOTE_RX} y2={minY - STEM_LENGTH} stroke={NOTE_COLOR} strokeWidth={1.8} />
-        ) : (
-          <Line x1={centerX - NOTE_RX} y1={minY} x2={centerX - NOTE_RX} y2={maxY + STEM_LENGTH} stroke={NOTE_COLOR} strokeWidth={1.8} />
-        )}
-        {showLabels && (
-          <SvgText x={centerX} y={height - 2} fontSize={10} fill={LABEL_COLOR} textAnchor="middle" fontWeight="600">
-            {notes.map((n) => n.replace(/\d$/, '')).join(', ')}
-          </SvgText>
-        )}
-      </Svg>
-    </View>
+    <View
+      ref={containerRef}
+      style={[styles.container, { width, height }]}
+    />
   );
 }
 
-// 스케일/음정: 왼쪽에서 오른쪽으로 나열
-function SequentialNotation({
+function NativeFallback({
   notes,
   clef,
-  showLabels,
-  width: propWidth,
-  height: propHeight,
+  mode,
 }: {
   notes: string[];
   clef: Clef;
-  showLabels: boolean;
-  width?: number;
-  height?: number;
+  mode: 'sequential' | 'stacked';
 }) {
-  const CLEF_WIDTH = 35;
-  const spacing = 40;
-  const startX = CLEF_WIDTH + 15;
-  const width = propWidth ?? Math.max(startX + notes.length * spacing + 20, 200);
-  const height = propHeight ?? (showLabels ? 90 : 80);
-  const positions = getNotesPositions(notes, clef);
+  const notesWithOctave = notes.map((n) => withOctave(n, clef));
+  const clefLabel = clef === 'treble' ? 'Treble' : 'Bass';
+  const notesText = formatNotesText(notesWithOctave, mode);
 
   return (
-    <View style={{ alignItems: 'center' }}>
-      <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-        <StaffLines x1={10} x2={width - 10} />
-        <ClefSymbol clef={clef} x={14} />
-        {positions.map((pos, i) => {
-          const x = startX + i * spacing;
-          return (
-            <G key={i}>
-              <NoteHead x={x} y={pos.y} accidental={pos.accidental} ledgerLines={pos.ledgerLines} />
-              {showLabels && (
-                <SvgText x={x} y={height - 2} fontSize={9} fill={LABEL_COLOR} textAnchor="middle">
-                  {notes[i].replace(/\d$/, '')}
-                </SvgText>
-              )}
-            </G>
-          );
-        })}
-      </Svg>
+    <View style={styles.fallbackContainer}>
+      <Text style={styles.clefText}>{clefLabel}</Text>
+      <Text style={styles.notesText}>{notesText}</Text>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fallbackContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    gap: 12,
+  },
+  clefText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  notesText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0F172A',
+    letterSpacing: 1,
+  },
+});

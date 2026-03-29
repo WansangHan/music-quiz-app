@@ -2,8 +2,10 @@ import {
   noteIndex,
   noteName,
   transpose,
+  transposeByInterval,
   getEnharmonic,
   getAllNoteNames,
+  getAllNoteNamesExtended,
   getSolfege,
   getChordTones,
   getChordLabel,
@@ -20,6 +22,8 @@ import {
   SCALE_TYPES,
   NATURAL_ROOTS,
   CHROMATIC_ROOTS,
+  assignOctaves,
+  P1, m2, M2, m3, M3, P4, A4, d5, P5, A5, m6, M6, m7, M7, P8,
 } from '../src/lib/musicTheory';
 
 // --- noteIndex ---
@@ -224,41 +228,7 @@ describe('getIntervalSemitones', () => {
   });
 });
 
-// --- getChordTones / getChordLabel ---
-
-describe('getChordTones', () => {
-  it('returns correct Major triad', () => {
-    expect(getChordTones('C', 'Major')).toEqual(['C', 'E', 'G']);
-  });
-
-  it('returns correct Minor triad', () => {
-    expect(getChordTones('A', 'Minor')).toEqual(['A', 'C', 'E']);
-  });
-
-  it('returns correct Diminished triad', () => {
-    expect(getChordTones('B', 'Diminished')).toEqual(['B', 'D', 'F']);
-  });
-
-  it('returns correct Augmented triad', () => {
-    expect(getChordTones('C', 'Augmented')).toEqual(['C', 'E', 'G#']);
-  });
-
-  it('returns correct Dominant7', () => {
-    expect(getChordTones('G', 'Dominant7')).toEqual(['G', 'B', 'D', 'F']);
-  });
-
-  it('returns correct Major7', () => {
-    expect(getChordTones('C', 'Major7')).toEqual(['C', 'E', 'G', 'B']);
-  });
-
-  it('returns correct Minor7', () => {
-    expect(getChordTones('D', 'Minor7')).toEqual(['D', 'F', 'A', 'C']);
-  });
-
-  it('returns [root] for unknown chord type', () => {
-    expect(getChordTones('C', 'UnknownChord')).toEqual(['C']);
-  });
-});
+// --- getChordLabel ---
 
 describe('getChordLabel', () => {
   it('returns Korean label for known types', () => {
@@ -272,33 +242,7 @@ describe('getChordLabel', () => {
   });
 });
 
-// --- getScaleTones / getScaleLabel ---
-
-describe('getScaleTones', () => {
-  it('returns correct C Major scale', () => {
-    expect(getScaleTones('C', 'Major')).toEqual(['C', 'D', 'E', 'F', 'G', 'A', 'B']);
-  });
-
-  it('returns correct A Natural Minor scale', () => {
-    expect(getScaleTones('A', 'NaturalMinor')).toEqual(['A', 'B', 'C', 'D', 'E', 'F', 'G']);
-  });
-
-  it('returns correct G Major scale', () => {
-    expect(getScaleTones('G', 'Major')).toEqual(['G', 'A', 'B', 'C', 'D', 'E', 'F#']);
-  });
-
-  it('returns correct D Major scale', () => {
-    expect(getScaleTones('D', 'Major')).toEqual(['D', 'E', 'F#', 'G', 'A', 'B', 'C#']);
-  });
-
-  it('returns correct E Natural Minor scale', () => {
-    expect(getScaleTones('E', 'NaturalMinor')).toEqual(['E', 'F#', 'G', 'A', 'B', 'C', 'D']);
-  });
-
-  it('returns [root] for unknown scale type', () => {
-    expect(getScaleTones('C', 'UnknownScale')).toEqual(['C']);
-  });
-});
+// --- getScaleLabel ---
 
 describe('getScaleLabel', () => {
   it('returns Korean label for known types', () => {
@@ -430,5 +374,417 @@ describe('music theory correctness', () => {
       expect(getIntervalName(interval.semitones)).toBe(interval.name);
       expect(getIntervalSemitones(interval.name)).toBe(interval.semitones);
     }
+  });
+});
+
+// --- assignOctaves ---
+
+describe('assignOctaves', () => {
+  it('C Major stays in octave 4 (root=C, all higher)', () => {
+    expect(assignOctaves(['C', 'E', 'G'])).toEqual(['C4', 'E4', 'G4']);
+  });
+
+  it('A Major wraps C# and E to octave 5', () => {
+    expect(assignOctaves(['A', 'C#', 'E'])).toEqual(['A4', 'C#5', 'E5']);
+  });
+
+  it('G Major wraps only notes below G to octave 5', () => {
+    expect(assignOctaves(['G', 'B', 'D'])).toEqual(['G4', 'B4', 'D5']);
+  });
+
+  it('F Major wraps C to octave 5', () => {
+    expect(assignOctaves(['F', 'A', 'C'])).toEqual(['F4', 'A4', 'C5']);
+  });
+
+  it('B Diminished wraps D and F to octave 5', () => {
+    expect(assignOctaves(['B', 'D', 'F'])).toEqual(['B4', 'D5', 'F5']);
+  });
+
+  it('respects custom base octave', () => {
+    expect(assignOctaves(['A', 'C#', 'E'], 3)).toEqual(['A3', 'C#4', 'E4']);
+  });
+
+  it('scale: G Major ascending', () => {
+    expect(assignOctaves(['G', 'A', 'B', 'C', 'D', 'E', 'F#']))
+      .toEqual(['G4', 'A4', 'B4', 'C5', 'D5', 'E5', 'F#5']);
+  });
+
+  it('empty input returns empty', () => {
+    expect(assignOctaves([])).toEqual([]);
+  });
+
+  it('single note stays at base octave', () => {
+    expect(assignOctaves(['A'])).toEqual(['A4']);
+  });
+
+  it('handles flats (Eb, Ab, Bb)', () => {
+    expect(assignOctaves(['C', 'Eb', 'G'])).toEqual(['C4', 'Eb4', 'G4']);
+    expect(assignOctaves(['F', 'Ab', 'C'])).toEqual(['F4', 'Ab4', 'C5']);
+  });
+});
+
+// --- transposeByInterval (핵심: 이명동음 철자 검증) ---
+
+describe('transposeByInterval', () => {
+  describe('완전 음정 (Perfect)', () => {
+    it('P1: 동음', () => {
+      expect(transposeByInterval('C', P1)).toBe('C');
+      expect(transposeByInterval('F#', P1)).toBe('F#');
+    });
+
+    it('P4: 완전4도', () => {
+      expect(transposeByInterval('C', P4)).toBe('F');
+      expect(transposeByInterval('G', P4)).toBe('C');
+      expect(transposeByInterval('D', P4)).toBe('G');
+      expect(transposeByInterval('F', P4)).toBe('Bb');
+      expect(transposeByInterval('B', P4)).toBe('E');
+    });
+
+    it('P5: 완전5도', () => {
+      expect(transposeByInterval('C', P5)).toBe('G');
+      expect(transposeByInterval('D', P5)).toBe('A');
+      expect(transposeByInterval('E', P5)).toBe('B');
+      expect(transposeByInterval('F', P5)).toBe('C');
+      expect(transposeByInterval('G', P5)).toBe('D');
+      expect(transposeByInterval('A', P5)).toBe('E');
+      expect(transposeByInterval('B', P5)).toBe('F#');
+    });
+
+    it('P8: 완전8도', () => {
+      expect(transposeByInterval('C', P8)).toBe('C');
+      expect(transposeByInterval('A', P8)).toBe('A');
+    });
+  });
+
+  describe('장음정 (Major)', () => {
+    it('M2: 장2도', () => {
+      expect(transposeByInterval('C', M2)).toBe('D');
+      expect(transposeByInterval('F', M2)).toBe('G');
+      expect(transposeByInterval('B', M2)).toBe('C#');
+      expect(transposeByInterval('A', M2)).toBe('B');
+    });
+
+    it('M3: 장3도', () => {
+      expect(transposeByInterval('C', M3)).toBe('E');
+      expect(transposeByInterval('D', M3)).toBe('F#');
+      expect(transposeByInterval('F', M3)).toBe('A');
+      expect(transposeByInterval('G', M3)).toBe('B');
+      expect(transposeByInterval('A', M3)).toBe('C#');
+      expect(transposeByInterval('B', M3)).toBe('D#');
+    });
+
+    it('M6: 장6도', () => {
+      expect(transposeByInterval('C', M6)).toBe('A');
+      expect(transposeByInterval('D', M6)).toBe('B');
+      expect(transposeByInterval('G', M6)).toBe('E');
+      expect(transposeByInterval('F', M6)).toBe('D');
+    });
+
+    it('M7: 장7도', () => {
+      expect(transposeByInterval('C', M7)).toBe('B');
+      expect(transposeByInterval('G', M7)).toBe('F#');
+      expect(transposeByInterval('D', M7)).toBe('C#');
+      expect(transposeByInterval('F', M7)).toBe('E');
+      expect(transposeByInterval('A', M7)).toBe('G#');
+    });
+  });
+
+  describe('단음정 (Minor) — 플랫 철자 핵심 검증', () => {
+    it('m2: 단2도', () => {
+      expect(transposeByInterval('C', m2)).toBe('Db');
+      expect(transposeByInterval('E', m2)).toBe('F');
+      expect(transposeByInterval('B', m2)).toBe('C');
+    });
+
+    it('m3: 단3도 — C+m3=Eb (not D#)', () => {
+      expect(transposeByInterval('C', m3)).toBe('Eb');
+      expect(transposeByInterval('A', m3)).toBe('C');
+      expect(transposeByInterval('D', m3)).toBe('F');
+      expect(transposeByInterval('E', m3)).toBe('G');
+      expect(transposeByInterval('F', m3)).toBe('Ab');
+      expect(transposeByInterval('G', m3)).toBe('Bb');
+      expect(transposeByInterval('B', m3)).toBe('D');
+    });
+
+    it('m6: 단6도', () => {
+      expect(transposeByInterval('C', m6)).toBe('Ab');
+      expect(transposeByInterval('D', m6)).toBe('Bb');
+      expect(transposeByInterval('E', m6)).toBe('C');
+      expect(transposeByInterval('A', m6)).toBe('F');
+    });
+
+    it('m7: 단7도', () => {
+      expect(transposeByInterval('C', m7)).toBe('Bb');
+      expect(transposeByInterval('D', m7)).toBe('C');
+      expect(transposeByInterval('G', m7)).toBe('F');
+      expect(transposeByInterval('E', m7)).toBe('D');
+    });
+  });
+
+  describe('증음정/감음정 (Augmented/Diminished)', () => {
+    it('A4: 증4도', () => {
+      expect(transposeByInterval('C', A4)).toBe('F#');
+      expect(transposeByInterval('F', A4)).toBe('B');
+    });
+
+    it('d5: 감5도', () => {
+      expect(transposeByInterval('C', d5)).toBe('Gb');
+      expect(transposeByInterval('B', d5)).toBe('F');
+      expect(transposeByInterval('E', d5)).toBe('Bb');
+    });
+
+    it('A5: 증5도', () => {
+      expect(transposeByInterval('C', A5)).toBe('G#');
+      expect(transposeByInterval('D', A5)).toBe('A#');
+      expect(transposeByInterval('E', A5)).toBe('B#');
+    });
+
+    it('A5: 이중 임시표 정규화 (B+A5 → F## → G)', () => {
+      expect(transposeByInterval('B', A5)).toBe('G');
+    });
+  });
+
+  describe('같은 반음, 다른 다이아토닉 → 다른 철자', () => {
+    it('C+m3(3반음,diatonic2)=Eb vs C+A2(3반음,diatonic1)=D#', () => {
+      expect(transposeByInterval('C', { diatonic: 2, semitones: 3 })).toBe('Eb');
+      expect(transposeByInterval('C', { diatonic: 1, semitones: 3 })).toBe('D#');
+    });
+
+    it('C+d5(6반음,diatonic4)=Gb vs C+A4(6반음,diatonic3)=F#', () => {
+      expect(transposeByInterval('C', d5)).toBe('Gb');
+      expect(transposeByInterval('C', A4)).toBe('F#');
+    });
+  });
+
+  describe('유효하지 않은 루트', () => {
+    it('returns root unchanged for invalid letter', () => {
+      expect(transposeByInterval('X', M3)).toBe('X');
+    });
+  });
+
+  describe('임시표가 있는 루트', () => {
+    it('F# + m3 → A', () => {
+      expect(transposeByInterval('F#', m3)).toBe('A');
+    });
+
+    it('Eb + P5 → Bb', () => {
+      expect(transposeByInterval('Eb', P5)).toBe('Bb');
+    });
+
+    it('Bb + M3 → D', () => {
+      expect(transposeByInterval('Bb', M3)).toBe('D');
+    });
+  });
+});
+
+// --- getChordTones: 7개 루트 × 7개 코드 타입 전수 검증 ---
+
+describe('getChordTones — comprehensive', () => {
+  describe('Major (P1, M3, P5)', () => {
+    it.each([
+      ['C', ['C', 'E', 'G']],
+      ['D', ['D', 'F#', 'A']],
+      ['E', ['E', 'G#', 'B']],
+      ['F', ['F', 'A', 'C']],
+      ['G', ['G', 'B', 'D']],
+      ['A', ['A', 'C#', 'E']],
+      ['B', ['B', 'D#', 'F#']],
+    ])('%s Major', (root, expected) => {
+      expect(getChordTones(root, 'Major')).toEqual(expected);
+    });
+  });
+
+  describe('Minor (P1, m3, P5)', () => {
+    it.each([
+      ['C', ['C', 'Eb', 'G']],
+      ['D', ['D', 'F', 'A']],
+      ['E', ['E', 'G', 'B']],
+      ['F', ['F', 'Ab', 'C']],
+      ['G', ['G', 'Bb', 'D']],
+      ['A', ['A', 'C', 'E']],
+      ['B', ['B', 'D', 'F#']],
+    ])('%s Minor', (root, expected) => {
+      expect(getChordTones(root, 'Minor')).toEqual(expected);
+    });
+  });
+
+  describe('Diminished (P1, m3, d5)', () => {
+    it.each([
+      ['C', ['C', 'Eb', 'Gb']],
+      ['D', ['D', 'F', 'Ab']],
+      ['E', ['E', 'G', 'Bb']],
+      ['F', ['F', 'Ab', 'Cb']],
+      ['G', ['G', 'Bb', 'Db']],
+      ['A', ['A', 'C', 'Eb']],
+      ['B', ['B', 'D', 'F']],
+    ])('%s Diminished', (root, expected) => {
+      expect(getChordTones(root, 'Diminished')).toEqual(expected);
+    });
+  });
+
+  describe('Augmented (P1, M3, A5)', () => {
+    it.each([
+      ['C', ['C', 'E', 'G#']],
+      ['D', ['D', 'F#', 'A#']],
+      ['E', ['E', 'G#', 'B#']],
+      ['F', ['F', 'A', 'C#']],
+      ['G', ['G', 'B', 'D#']],
+      ['A', ['A', 'C#', 'E#']],
+      ['B', ['B', 'D#', 'G']],  // F## 정규화 → G
+    ])('%s Augmented', (root, expected) => {
+      expect(getChordTones(root, 'Augmented')).toEqual(expected);
+    });
+  });
+
+  describe('Dominant7 (P1, M3, P5, m7)', () => {
+    it.each([
+      ['C', ['C', 'E', 'G', 'Bb']],
+      ['D', ['D', 'F#', 'A', 'C']],
+      ['G', ['G', 'B', 'D', 'F']],
+      ['A', ['A', 'C#', 'E', 'G']],
+      ['F', ['F', 'A', 'C', 'Eb']],
+      ['E', ['E', 'G#', 'B', 'D']],
+      ['B', ['B', 'D#', 'F#', 'A']],
+    ])('%s Dominant7', (root, expected) => {
+      expect(getChordTones(root, 'Dominant7')).toEqual(expected);
+    });
+  });
+
+  describe('Major7 (P1, M3, P5, M7)', () => {
+    it.each([
+      ['C', ['C', 'E', 'G', 'B']],
+      ['F', ['F', 'A', 'C', 'E']],
+      ['G', ['G', 'B', 'D', 'F#']],
+      ['D', ['D', 'F#', 'A', 'C#']],
+    ])('%s Major7', (root, expected) => {
+      expect(getChordTones(root, 'Major7')).toEqual(expected);
+    });
+  });
+
+  describe('Minor7 (P1, m3, P5, m7)', () => {
+    it.each([
+      ['C', ['C', 'Eb', 'G', 'Bb']],
+      ['D', ['D', 'F', 'A', 'C']],
+      ['A', ['A', 'C', 'E', 'G']],
+      ['E', ['E', 'G', 'B', 'D']],
+    ])('%s Minor7', (root, expected) => {
+      expect(getChordTones(root, 'Minor7')).toEqual(expected);
+    });
+  });
+
+  it('returns [root] for unknown chord type', () => {
+    expect(getChordTones('C', 'UnknownChord')).toEqual(['C']);
+  });
+
+  it('all chord types return correct number of tones', () => {
+    for (const root of NATURAL_ROOTS) {
+      for (const chord of CHORD_TYPES) {
+        const tones = getChordTones(root, chord.type);
+        expect(tones).toHaveLength(chord.formula.length);
+      }
+    }
+  });
+});
+
+// --- getScaleTones: 7개 루트 × 2개 스케일 전수 검증 ---
+
+describe('getScaleTones — comprehensive', () => {
+  describe('Major', () => {
+    it.each([
+      ['C', ['C', 'D', 'E', 'F', 'G', 'A', 'B']],
+      ['D', ['D', 'E', 'F#', 'G', 'A', 'B', 'C#']],
+      ['E', ['E', 'F#', 'G#', 'A', 'B', 'C#', 'D#']],
+      ['F', ['F', 'G', 'A', 'Bb', 'C', 'D', 'E']],
+      ['G', ['G', 'A', 'B', 'C', 'D', 'E', 'F#']],
+      ['A', ['A', 'B', 'C#', 'D', 'E', 'F#', 'G#']],
+      ['B', ['B', 'C#', 'D#', 'E', 'F#', 'G#', 'A#']],
+    ])('%s Major', (root, expected) => {
+      expect(getScaleTones(root, 'Major')).toEqual(expected);
+    });
+  });
+
+  describe('Natural Minor', () => {
+    it.each([
+      ['C', ['C', 'D', 'Eb', 'F', 'G', 'Ab', 'Bb']],
+      ['D', ['D', 'E', 'F', 'G', 'A', 'Bb', 'C']],
+      ['E', ['E', 'F#', 'G', 'A', 'B', 'C', 'D']],
+      ['F', ['F', 'G', 'Ab', 'Bb', 'C', 'Db', 'Eb']],
+      ['G', ['G', 'A', 'Bb', 'C', 'D', 'Eb', 'F']],
+      ['A', ['A', 'B', 'C', 'D', 'E', 'F', 'G']],
+      ['B', ['B', 'C#', 'D', 'E', 'F#', 'G', 'A']],
+    ])('%s NaturalMinor', (root, expected) => {
+      expect(getScaleTones(root, 'NaturalMinor')).toEqual(expected);
+    });
+  });
+
+  it('returns [root] for unknown scale type', () => {
+    expect(getScaleTones('C', 'UnknownScale')).toEqual(['C']);
+  });
+
+  it('all scales produce exactly 7 tones', () => {
+    for (const root of NATURAL_ROOTS) {
+      for (const scale of SCALE_TYPES) {
+        expect(getScaleTones(root, scale.type)).toHaveLength(7);
+      }
+    }
+  });
+
+  it('C Major = 모두 자연음 (임시표 없음)', () => {
+    const tones = getScaleTones('C', 'Major');
+    for (const tone of tones) {
+      expect(tone).toMatch(/^[A-G]$/);
+    }
+  });
+
+  it('A NaturalMinor = 모두 자연음 (임시표 없음)', () => {
+    const tones = getScaleTones('A', 'NaturalMinor');
+    for (const tone of tones) {
+      expect(tone).toMatch(/^[A-G]$/);
+    }
+  });
+});
+
+// --- INTERVALS diatonic field ---
+
+describe('INTERVALS diatonic field', () => {
+  it('all intervals have valid diatonic values', () => {
+    for (const interval of INTERVALS) {
+      expect(interval.diatonic).toBeGreaterThanOrEqual(0);
+      expect(interval.diatonic).toBeLessThanOrEqual(7);
+    }
+  });
+});
+
+// --- getAllNoteNamesExtended ---
+
+describe('getAllNoteNamesExtended', () => {
+  it('returns 17 note names (sharps + flats)', () => {
+    const names = getAllNoteNamesExtended();
+    expect(names).toHaveLength(17);
+    expect(names).toContain('Eb');
+    expect(names).toContain('Bb');
+    expect(names).toContain('Ab');
+    expect(names).toContain('Db');
+    expect(names).toContain('Gb');
+  });
+});
+
+// --- ENHARMONIC_MAP 확장 ---
+
+describe('getEnharmonic extended', () => {
+  it('B# ↔ C', () => {
+    expect(getEnharmonic('B#')).toBe('C');
+  });
+
+  it('Cb ↔ B', () => {
+    expect(getEnharmonic('Cb')).toBe('B');
+  });
+
+  it('E# ↔ F', () => {
+    expect(getEnharmonic('E#')).toBe('F');
+  });
+
+  it('Fb ↔ E', () => {
+    expect(getEnharmonic('Fb')).toBe('E');
   });
 });

@@ -1,5 +1,5 @@
 import { TopicCategory } from '../constants/topicCategory';
-import { INTERVALS, CHORD_TYPES, SCALE_TYPES, getAllNoteNames, getSolfege } from './musicTheory';
+import { INTERVALS, CHORD_TYPES, SCALE_TYPES, NATURAL_ROOTS, getAllNoteNamesExtended, getSolfege, getEnharmonic } from './musicTheory';
 import { CHOICE_COUNT } from '../constants/quiz';
 
 function shuffle<T>(arr: T[]): T[] {
@@ -31,16 +31,21 @@ export function generateChoices(
       break;
     }
     case TopicCategory.Chord: {
-      // 같은 루트의 다른 코드 타입
+      // 같은 루트 2개 + 다른 루트 1개
       const rootMatch = question.match(/^([A-G][#b]?)/);
       const root = rootMatch?.[1] ?? 'C';
-      const pool = CHORD_TYPES.map((c) => `${root} ${c.typeKr}`);
-      distractors = pickDistractors(correctAnswer, pool, needed);
+      const sameRootPool = CHORD_TYPES.map((c) => `${root} ${c.typeKr}`);
+      const sameRoot = pickDistractors(correctAnswer, sameRootPool, 2);
+      const diffRootPool = NATURAL_ROOTS
+        .filter((r) => r !== root)
+        .flatMap((r) => CHORD_TYPES.map((c) => `${r} ${c.typeKr}`));
+      const diffRoot = pickDistractors(correctAnswer, diffRootPool, 1);
+      distractors = [...sameRoot, ...diffRoot];
       break;
     }
     case TopicCategory.Scale: {
       const allLabels: string[] = [];
-      for (const root of getAllNoteNames()) {
+      for (const root of NATURAL_ROOTS) {
         for (const scale of SCALE_TYPES) {
           allLabels.push(`${root} ${scale.typeKr}`);
         }
@@ -50,15 +55,18 @@ export function generateChoices(
     }
     case TopicCategory.ChordTone:
     case TopicCategory.ScaleTone: {
-      const pool = getAllNoteNames();
-      distractors = pickDistractors(correctAnswer, pool, needed);
+      const pool = getAllNoteNamesExtended();
+      const enh = getEnharmonic(correctAnswer);
+      const filtered = pool.filter((p) => p !== correctAnswer && p !== enh);
+      distractors = shuffle(filtered).slice(0, needed);
       break;
     }
     case TopicCategory.NoteName: {
-      // 질문에 따라 음이름 또는 계이름 풀 사용
       const isSolfegeAnswer = getSolfege().includes(correctAnswer);
-      const pool = isSolfegeAnswer ? getSolfege() : getAllNoteNames();
-      distractors = pickDistractors(correctAnswer, pool, needed);
+      const pool = isSolfegeAnswer ? getSolfege() : getAllNoteNamesExtended();
+      const enh = getEnharmonic(correctAnswer);
+      const filtered = pool.filter((p) => p !== correctAnswer && p !== enh);
+      distractors = shuffle(filtered).slice(0, needed);
       break;
     }
   }

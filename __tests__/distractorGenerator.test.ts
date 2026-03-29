@@ -50,14 +50,15 @@ describe('generateChoices', () => {
       expect(result.choices[result.correctIndex]).toBe('C 메이저');
     });
 
-    it('generates distractors with same root note', () => {
+    it('mixes same-root and different-root distractors', () => {
       const result = generateChoices(TopicCategory.Chord, 'G 도미넌트 7', 'G, B, D, F 구성음의 코드는?');
       expect(result.choices).toHaveLength(4);
       expect(result.choices[result.correctIndex]).toBe('G 도미넌트 7');
-      // All distractors should start with 'G ' since question starts with 'G'
-      for (const c of result.choices) {
-        expect(c).toMatch(/^G /);
-      }
+      const distractors = result.choices.filter((c) => c !== 'G 도미넌트 7');
+      const sameRoot = distractors.filter((c) => c.startsWith('G '));
+      const diffRoot = distractors.filter((c) => !c.startsWith('G '));
+      expect(sameRoot.length).toBe(2);
+      expect(diffRoot.length).toBe(1);
     });
 
     it('handles question that does not start with a note', () => {
@@ -97,7 +98,7 @@ describe('generateChoices', () => {
     it('uses note names as choices', () => {
       const result = generateChoices(TopicCategory.ChordTone, 'E', 'C 메이저 코드의 3음은?');
       for (const c of result.choices) {
-        expect(c).toMatch(/^[A-G][#]?$/);
+        expect(c).toMatch(/^[A-G][#b]?$/);
       }
     });
   });

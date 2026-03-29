@@ -26,7 +26,8 @@
     "react-native-safe-area-context": "^5.7.0",
     "react-native-screens": "^4.24.0",
     "react-native-svg": "15.12.1",
-    "react-native-web": "^0.21.2"
+    "react-native-web": "^0.21.2",
+    "vexflow": "^5.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

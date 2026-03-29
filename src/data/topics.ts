@@ -5,7 +5,8 @@ import {
   INTERVALS,
   CHORD_TYPES,
   SCALE_TYPES,
-  transpose,
+  transposeByInterval,
+  assignOctaves,
   getChordTones,
   getChordLabel,
   getToneLabel,
@@ -26,7 +27,7 @@ function generateIntervalTopics(): TopicData[] {
       if (interval.semitones === 0) continue;
       if (interval.semitones === 12) continue;
 
-      const target = transpose(root, interval.semitones);
+      const target = transposeByInterval(root, interval);
       topics.push({
         id: `interval_${root}_${interval.semitones}`,
         category: TopicCategory.Interval,
@@ -36,7 +37,7 @@ function generateIntervalTopics(): TopicData[] {
         description: `${interval.semitones}반음. ${interval.nameEn}`,
         difficulty: interval.semitones <= 5 ? 1 : interval.semitones <= 9 ? 2 : 3,
         sortOrder: order++,
-        notation: { notes: [`${root}4`, `${target}4`], mode: 'sequential' },
+        notation: { notes: assignOctaves([root, target]), mode: 'sequential' },
       });
     }
   }
@@ -63,7 +64,7 @@ function generateChordTopics(): TopicData[] {
         description: `${root} ${chord.typeKr} (${chord.type}): ${tonesStr}`,
         difficulty: chord.formula.length <= 3 ? 1 : 2,
         sortOrder: order++,
-        notation: { notes: tones.map((t) => `${t}4`), mode: 'stacked' },
+        notation: { notes: assignOctaves(tones), mode: 'stacked' },
       });
     }
   }
@@ -90,7 +91,7 @@ function generateScaleTopics(): TopicData[] {
         description: `${label}: ${tonesStr}`,
         difficulty: scale.type === 'Major' ? 1 : 2,
         sortOrder: order++,
-        notation: { notes: tones.map((t) => `${t}4`), mode: 'sequential' },
+        notation: { notes: assignOctaves(tones), mode: 'sequential' },
       });
     }
   }
@@ -118,7 +119,7 @@ function generateChordToneTopics(): TopicData[] {
           description: `${label}: ${tones.map((t, j) => `${getToneLabel(j, tones.length)}=${t}`).join(', ')}`,
           difficulty: i === 0 ? 1 : chord.formula.length > 3 ? 3 : 2,
           sortOrder: order++,
-          notation: { notes: tones.map((t) => `${t}4`), mode: 'stacked' },
+          notation: { notes: assignOctaves(tones), mode: 'stacked' },
         });
       }
     }
@@ -147,7 +148,7 @@ function generateScaleToneTopics(): TopicData[] {
           description: `${label}: ${tones.map((t, j) => `${j + 1}음=${t}`).join(', ')}`,
           difficulty: scale.type === 'Major' ? 1 : 2,
           sortOrder: order++,
-          notation: { notes: tones.map((t) => `${t}4`), mode: 'sequential' },
+          notation: { notes: assignOctaves(tones), mode: 'sequential' },
         });
       }
     }
