@@ -22,6 +22,7 @@ interface StaffNotationProps {
 const NOTE_RX = 7;
 const NOTE_RY = 5;
 const STEM_LENGTH = 30;
+const ACCIDENTAL_OFFSET = 18; // 임시표와 음표 머리 사이 간격
 const STAFF_COLOR = '#CBD5E1';
 const NOTE_COLOR = '#0F172A';
 const LABEL_COLOR = '#6366F1';
@@ -35,6 +36,15 @@ function StaffLines({ x1, x2 }: { x1: number; x2: number }) {
       ))}
     </G>
   );
+}
+
+function ClefSymbol({ clef, x }: { clef: Clef; x: number }) {
+  if (clef === 'treble') {
+    // 높은음자리표 — Unicode 𝄞
+    return <SvgText x={x} y={52} fontSize={40} fill={NOTE_COLOR} fontFamily="serif">{'\u{1D11E}'}</SvgText>;
+  }
+  // 낮은음자리표 — Unicode 𝄢
+  return <SvgText x={x} y={48} fontSize={36} fill={NOTE_COLOR} fontFamily="serif">{'\u{1D122}'}</SvgText>;
 }
 
 function LedgerLines({ x, lines }: { x: number; lines: number[] }) {
@@ -79,7 +89,7 @@ function NoteHead({
   return (
     <G>
       <LedgerLines x={x} lines={ledgerLines} />
-      {accidental && <Accidental x={x - 14} y={y} type={accidental} />}
+      {accidental && <Accidental x={x - ACCIDENTAL_OFFSET} y={y} type={accidental} />}
       <Ellipse
         cx={x}
         cy={y}
@@ -129,11 +139,14 @@ function StackedNotation({
   width?: number;
   height?: number;
 }) {
-  const width = propWidth ?? 160;
-  const height = propHeight ?? (showLabels ? 90 : 80);
-  const centerX = width / 2 + 10;
+  const CLEF_WIDTH = 30;
   const positions = getNotesPositions(notes, clef);
   const offsets = getChordOffsets(positions);
+  const hasAccidentals = positions.some((p) => p.accidental);
+  const accidentalSpace = hasAccidentals ? 20 : 0;
+  const width = propWidth ?? (160 + accidentalSpace + CLEF_WIDTH);
+  const height = propHeight ?? (showLabels ? 90 : 80);
+  const centerX = CLEF_WIDTH + (width - CLEF_WIDTH) / 2 + accidentalSpace / 2;
 
   // 기둥: 가장 낮은 음에서 가장 높은 음까지
   const ys = positions.map((p) => p.y);
@@ -141,14 +154,24 @@ function StackedNotation({
   const maxY = Math.max(...ys);
   const dir = stemDirection((minY + maxY) / 2);
 
+  // 임시표를 겹치지 않게 열로 배치
+  const accidentalX = centerX - NOTE_RX - ACCIDENTAL_OFFSET;
+
   return (
     <View style={{ alignItems: 'center' }}>
       <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
         <StaffLines x1={10} x2={width - 10} />
+        <ClefSymbol clef={clef} x={14} />
+        {/* 임시표 열 (음표 왼쪽에 별도 열) */}
+        {positions.map((pos, i) =>
+          pos.accidental ? (
+            <Accidental key={`acc-${i}`} x={accidentalX} y={pos.y} type={pos.accidental} />
+          ) : null
+        )}
+        {/* 음표 열 */}
         {positions.map((pos, i) => (
           <G key={i}>
             <LedgerLines x={centerX + offsets[i]} lines={pos.ledgerLines} />
-            {pos.accidental && <Accidental x={centerX + offsets[i] - 14} y={pos.y} type={pos.accidental} />}
             <Ellipse
               cx={centerX + offsets[i]}
               cy={pos.y}
@@ -189,8 +212,9 @@ function SequentialNotation({
   width?: number;
   height?: number;
 }) {
+  const CLEF_WIDTH = 35;
   const spacing = 40;
-  const startX = 40;
+  const startX = CLEF_WIDTH + 15;
   const width = propWidth ?? Math.max(startX + notes.length * spacing + 20, 200);
   const height = propHeight ?? (showLabels ? 90 : 80);
   const positions = getNotesPositions(notes, clef);
@@ -199,6 +223,7 @@ function SequentialNotation({
     <View style={{ alignItems: 'center' }}>
       <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
         <StaffLines x1={10} x2={width - 10} />
+        <ClefSymbol clef={clef} x={14} />
         {positions.map((pos, i) => {
           const x = startX + i * spacing;
           return (
